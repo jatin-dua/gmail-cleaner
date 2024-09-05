@@ -95,6 +95,28 @@ func listMessageIds(srv *gmail.Service) ([]string, error) {
 	return messageIds, nil
 }
 
+func getMessage(srv *gmail.Service, id string) Message {
+	var message Message
+	message.Id = id
+
+	userId := "me"
+	r, err := srv.Users.Messages.Get(userId, id).Do()
+	if err != nil {
+		log.Fatalf("Unable to retrieve message: %v", err)
+	}
+	for _, header := range r.Payload.Headers {
+		switch strings.ToLower(header.Name) {
+		case "from":
+			message.From = header.Value
+		case "subject":
+			message.Subject = header.Value
+		case "date":
+			message.Date = header.Value
+		}
+	}
+	return message
+}
+
 func main() {
 	var sender string
 	flag.StringVar(&sender, "sender", "", "Target to delete messages")
@@ -128,6 +150,7 @@ func main() {
 	}
 
 	for _, id := range messageIds {
-		fmt.Println(id)
+		message := getMessage(srv, id)
+		fmt.Printf("Message: %v\n", message)
 	}
 }
