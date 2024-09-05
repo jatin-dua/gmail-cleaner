@@ -117,6 +117,44 @@ func getMessage(srv *gmail.Service, id string) Message {
 	return message
 }
 
+func deleteMessage(srv *gmail.Service, message Message) {
+	_ = srv
+	fmt.Printf("[DELETE]\nId: %s\nFrom: %s\nDate: %s\nSubject: %s\n\n", message.Id, message.From, message.Date, message.Subject)
+}
+
+func senderIsTarget(from, target string) bool {
+	return strings.Contains(from, target)
+}
+
+func deleteMessages(srv *gmail.Service, target string) {
+	messageIds, err := listMessageIds(srv)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var messagesToDelete []string
+	for _, messageId := range messageIds {
+		message := getMessage(srv, messageId)
+		if senderIsTarget(message.From, target) {
+			messagesToDelete = append(messagesToDelete, messageId)
+			deleteMessage(srv, message)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	fmt.Print("Continue Delete: [y/N] ")
+	var choice string
+	fmt.Scanln(&choice)
+	if choice == "y" {
+		fmt.Println("Deletion in Progress...")
+		err = srv.Users.Messages.BatchDelete("me", &gmail.BatchDeleteMessagesRequest{
+			Ids: messagesToDelete,
+		}).Do()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
 func main() {
 	var sender string
 	flag.StringVar(&sender, "sender", "", "Target to delete messages")
