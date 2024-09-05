@@ -8,8 +8,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
-	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -72,6 +70,31 @@ func saveToken(path string, token *oauth2.Token) {
 	json.NewEncoder(f).Encode(token)
 }
 
+type Message struct {
+	Id      string
+	From    string
+	Subject string
+	Date    string
+}
+
+func listMessageIds(srv *gmail.Service) ([]string, error) {
+	var messageIds []string
+	user := "me"
+	r, err := srv.Users.Messages.List(user).Do()
+	if err != nil {
+		return nil, err
+	}
+	if len(r.Messages) == 0 {
+		fmt.Println("No Messages found.")
+		return nil, err
+	}
+	// fmt.Printf("NextPageToken: %s\n", r.NextPageToken)
+	for _, l := range r.Messages {
+		messageIds = append(messageIds, l.Id)
+	}
+	return messageIds, nil
+}
+
 func main() {
 	var sender string
 	flag.StringVar(&sender, "sender", "", "Target to delete messages")
@@ -97,5 +120,14 @@ func main() {
 	srv, err := gmail.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
 		log.Fatalf("Unable to retrieve Gmail client: %v", err)
+	}
+
+	messageIds, err := listMessageIds(srv)
+	if err != nil {
+		log.Fatal("Unable to retrieve message Ids: %v", err)
+	}
+
+	for _, id := range messageIds {
+		fmt.Println(id)
 	}
 }
