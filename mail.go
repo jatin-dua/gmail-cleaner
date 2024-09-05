@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"google.golang.org/api/gmail/v1"
+	"google.golang.org/api/googleapi"
 )
 
 type Message struct {
@@ -15,10 +16,10 @@ type Message struct {
 	Date    string
 }
 
-func listMessageIds(srv *gmail.Service) ([]string, error) {
+func listMessageIds(srv *gmail.Service, maxResults string) ([]string, error) {
 	var messageIds []string
 	user := "me"
-	r, err := srv.Users.Messages.List(user).Do()
+	r, err := srv.Users.Messages.List(user).Do(googleapi.QueryParameter("maxResults", maxResults))
 	if err != nil {
 		return nil, err
 	}

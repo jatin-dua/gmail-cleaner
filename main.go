@@ -41,7 +41,8 @@ func main() {
 		log.Fatalf("Unable to retrieve Gmail client: %v", err)
 	}
 
-	messageIds, err := listMessageIds(srv)
+	MAX_RESULT_SIZE := "500"
+	messageIds, err := listMessageIds(srv, MAX_RESULT_SIZE)
 	if err != nil {
 		log.Fatalf("Unable to retrieve message Ids: %v", err)
 	}
