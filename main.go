@@ -123,33 +123,17 @@ func senderIsTarget(from, target string) bool {
 	return strings.Contains(from, target)
 }
 
-func deleteMessages(srv *gmail.Service, target string) {
-	messageIds, err := listMessageIds(srv)
+func deleteMessages(srv *gmail.Service, messagesToDelete []string) error {
+	log.Println("Messages deletion in Progress")
+	err := srv.Users.Messages.BatchDelete("me", &gmail.BatchDeleteMessagesRequest{
+		Ids: messagesToDelete,
+	}).Do()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	var messagesToDelete []string
-	for _, messageId := range messageIds {
-		message := getMessage(srv, messageId)
-		if senderIsTarget(message.From, target) {
-			fmt.Printf("[DELETE]\nId: %s\nFrom: %s\nDate: %s\nSubject: %s\n\n", message.Id, message.From, message.Date, message.Subject)
-			messagesToDelete = append(messagesToDelete, messageId)
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
+	log.Println("Messages deletion succeeded")
 
-	fmt.Print("Continue Delete: [y/N] ")
-	var choice string
-	fmt.Scanln(&choice)
-	if choice == "y" {
-		fmt.Println("Deletion in Progress...")
-		err = srv.Users.Messages.BatchDelete("me", &gmail.BatchDeleteMessagesRequest{
-			Ids: messagesToDelete,
-		}).Do()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
+	return nil
 }
 
 func main() {
@@ -184,8 +168,24 @@ func main() {
 		log.Fatal("Unable to retrieve message Ids: %v", err)
 	}
 
+	var messagesToDelete []string
 	for _, id := range messageIds {
 		message := getMessage(srv, id)
-		fmt.Printf("Message: %v\n", message)
+		if senderIsTarget(message.From, sender) {
+			fmt.Printf("[DELETE]\nId: %s\nFrom: %s\nDate: %s\nSubject: %s\n\n", message.Id, message.From, message.Date, message.Subject)
+			messagesToDelete = append(messagesToDelete, message.Id)
+		}
+		// To avoid rate-limiting
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	fmt.Print("Continue Delete: [y/N] ")
+	var choice string
+	fmt.Scanln(&choice)
+	if choice == "y" {
+		err = deleteMessages(srv, messagesToDelete)
+		if err != nil {
+			log.Fatal("Failed to delete messages: %v", err)
+		}
 	}
 }
