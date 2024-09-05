@@ -117,11 +117,6 @@ func getMessage(srv *gmail.Service, id string) Message {
 	return message
 }
 
-func deleteMessage(srv *gmail.Service, message Message) {
-	_ = srv
-	fmt.Printf("[DELETE]\nId: %s\nFrom: %s\nDate: %s\nSubject: %s\n\n", message.Id, message.From, message.Date, message.Subject)
-}
-
 func senderIsTarget(from, target string) bool {
 	return strings.Contains(from, target)
 }
@@ -135,8 +130,8 @@ func deleteMessages(srv *gmail.Service, target string) {
 	for _, messageId := range messageIds {
 		message := getMessage(srv, messageId)
 		if senderIsTarget(message.From, target) {
+			fmt.Printf("[DELETE]\nId: %s\nFrom: %s\nDate: %s\nSubject: %s\n\n", message.Id, message.From, message.Date, message.Subject)
 			messagesToDelete = append(messagesToDelete, messageId)
-			deleteMessage(srv, message)
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
