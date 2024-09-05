@@ -3,11 +3,8 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log"
 	"os"
-	"strings"
-	"time"
 
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/gmail/v1"
@@ -41,30 +38,7 @@ func main() {
 		log.Fatalf("Unable to retrieve Gmail client: %v", err)
 	}
 
-	MAX_RESULT_SIZE := "500"
-	messageIds, err := listMessageIds(srv, MAX_RESULT_SIZE)
-	if err != nil {
-		log.Fatalf("Unable to retrieve message Ids: %v", err)
-	}
-
-	var messagesToDelete []string
-	for _, id := range messageIds {
-		message := getMessage(srv, id)
-		if senderIsTarget(message.From, sender) {
-			fmt.Printf("[DELETE]\nId: %s\nFrom: %s\nDate: %s\nSubject: %s\n\n", message.Id, message.From, message.Date, message.Subject)
-			messagesToDelete = append(messagesToDelete, message.Id)
-		}
-		// To avoid rate-limiting
-		time.Sleep(100 * time.Millisecond)
-	}
-
-	fmt.Printf("Proceed deleting %d messages: [y/N] ", len(messagesToDelete))
-	var choice string
-	fmt.Scanln(&choice)
-	if strings.ToLower(choice) == "y" {
-		err = deleteMessages(srv, messagesToDelete)
-		if err != nil {
-			log.Fatalf("Failed to delete messages: %v", err)
-		}
+	if err := startMailer(srv, sender); err != nil {
+		log.Fatalf("Error occurred in mailer: %v", err)
 	}
 }
