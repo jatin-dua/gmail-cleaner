@@ -17,7 +17,7 @@ type Message struct {
 	Date    string
 }
 
-func startMailer(srv *gmail.Service, sender string) error {
+func startMailDeletion(srv *gmail.Service, sender string) error {
 	MAX_RESULT_SIZE := "500"
 	nextPageToken := ""
 	deleteCnt := 0

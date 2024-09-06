@@ -13,11 +13,14 @@ import (
 
 func main() {
 	var sender string
+	var deleteMessages bool
+
 	flag.StringVar(&sender, "sender", "", "Target to delete messages")
+	flag.BoolVar(&deleteMessages, "del", false, "Whether to delete messages or not")
 	flag.Parse()
 
-	if sender == "" {
-		log.Fatalf("usage: mailer -sender <target>")
+	if sender == "" || !deleteMessages {
+		log.Fatalf("usage: ./mailer -del -sender=<target>")
 	}
 
 	ctx := context.Background()
@@ -38,7 +41,9 @@ func main() {
 		log.Fatalf("Unable to retrieve Gmail client: %v", err)
 	}
 
-	if err := startMailer(srv, sender); err != nil {
-		log.Fatalf("Error occurred in mailer: %v", err)
+	if deleteMessages {
+		if err := startMailDeletion(srv, sender); err != nil {
+			log.Fatalf("Error occurred in mailer: %v", err)
+		}
 	}
 }
