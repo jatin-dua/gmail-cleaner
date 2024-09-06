@@ -19,32 +19,55 @@ type Message struct {
 
 func startMailer(srv *gmail.Service, sender string) error {
 	MAX_RESULT_SIZE := "500"
-	messageIds, err := listMessageIds(srv, MAX_RESULT_SIZE)
-	if err != nil {
-		// log.Fatalf("Unable to retrieve message Ids: %v", err)
-		return err
-	}
-
+	nextPageToken := ""
+	deleteCnt := 0
+	processedCnt := 0
 	var messagesToDelete []string
-	for _, id := range messageIds {
-		message, err := getMessage(srv, id)
+
+	for ok := true; ok; ok = nextPageToken != "" {
+		messageIds, pageToken, err := listMessageIds(srv, nextPageToken, MAX_RESULT_SIZE)
 		if err != nil {
+			// log.Fatalf("Unable to retrieve message Ids: %v", err)
 			return err
 		}
+		nextPageToken = pageToken
+		for _, id := range messageIds {
+			message, err := getMessage(srv, id)
+			if err != nil {
+				return err
+			}
+			processedCnt++
 
-		if senderIsTarget(message.From, sender) {
-			fmt.Printf("[DELETE]\nId: %s\nFrom: %s\nDate: %s\nSubject: %s\n\n", message.Id, message.From, message.Date, message.Subject)
-			messagesToDelete = append(messagesToDelete, message.Id)
+			if senderIsTarget(message.From, sender) {
+				fmt.Printf("Id: %s\nFrom: %s\nDate: %s\nSubject: %s\n\n",
+					message.Id,
+					message.From,
+					message.Date,
+					message.Subject,
+				)
+				deleteCnt++
+				messagesToDelete = append(messagesToDelete, message.Id)
+			}
+			// To avoid rate-limiting
+			time.Sleep(25 * time.Millisecond)
 		}
-		// To avoid rate-limiting
-		time.Sleep(100 * time.Millisecond)
+
+		if len(messagesToDelete) == 0 {
+			log.Println("No messages found from the target")
+			return nil
+		}
+
+		log.Println("Fetching next batch of mails")
 	}
 
-	fmt.Printf("Proceed deleting %d messages: [y/N] ", len(messagesToDelete))
+	fmt.Println()
+	fmt.Printf("Processed %d messages\n", processedCnt)
+	fmt.Printf("Proceed deleting %d messages [y/N]:", deleteCnt)
+
 	var choice string
 	fmt.Scanln(&choice)
 	if strings.ToLower(choice) == "y" {
-		err = deleteMessages(srv, messagesToDelete)
+		err := deleteMessages(srv, messagesToDelete)
 		if err != nil {
 			// log.Fatalf("Failed to delete messages: %v", err)
 			return err
@@ -54,23 +77,32 @@ func startMailer(srv *gmail.Service, sender string) error {
 	return nil
 }
 
-func listMessageIds(srv *gmail.Service, maxResults string) ([]string, error) {
+func listMessageIds(srv *gmail.Service, nextPageToken, maxResults string) ([]string, string, error) {
 	var messageIds []string
 	user := "me"
-	r, err := srv.Users.Messages.List(user).Do(googleapi.QueryParameter("maxResults", maxResults))
+
+	callOptions := []googleapi.CallOption{
+		googleapi.QueryParameter("maxResults", maxResults),
+	}
+
+	if nextPageToken != "" {
+		callOptions = append(callOptions, googleapi.QueryParameter("pageToken", nextPageToken))
+	}
+
+	r, err := srv.Users.Messages.List(user).Do(callOptions...)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if len(r.Messages) == 0 {
 		fmt.Println("No Messages found.")
-		return nil, err
+		return nil, "", err
 	}
-	// fmt.Printf("NextPageToken: %s\n", r.NextPageToken)
+
 	for _, l := range r.Messages {
 		messageIds = append(messageIds, l.Id)
 	}
 
-	return messageIds, nil
+	return messageIds, r.NextPageToken, nil
 }
 
 func getMessage(srv *gmail.Service, id string) (Message, error) {
@@ -91,6 +123,10 @@ func getMessage(srv *gmail.Service, id string) (Message, error) {
 			message.Subject = header.Value
 		case "date":
 			message.Date = header.Value
+		}
+
+		if (message.From != "") && (message.Subject != "") && (message.Date != "") {
+			break
 		}
 	}
 
