@@ -30,7 +30,11 @@ func startMailDeletion(cfg *Config) error {
 
 	const layout = "2 Jan 2006"
 
+	stop := false
 	for ok := true; ok; ok = nextPageToken != "" {
+		if stop {
+			break
+		}
 		messageIds, pageToken, err := listMessageIds(cfg.srv, nextPageToken, cfg.maxResultSize)
 		if err != nil {
 			// log.Fatalf("Unable to retrieve message Ids: %v", err)
@@ -56,8 +60,8 @@ func startMailDeletion(cfg *Config) error {
 				return err
 			}
 
-			if parsedDate.Before(cfg.deleteAfter) {
-				nextPageToken = ""
+			if len(messagesToDelete) >= cfg.deleteLimit || parsedDate.Before(cfg.deleteAfter) {
+				stop = true
 				break
 			}
 

@@ -19,6 +19,7 @@ type Config struct {
 	sender        string
 	deleteAfter   time.Time
 	maxResultSize string
+	deleteLimit   int
 }
 
 func startServer() {
@@ -42,9 +43,11 @@ func main() {
 
 	var sender string
 	var deleteAfter string
+	var limit int
 
 	flag.StringVar(&sender, "sender", "", "Target to delete messages")
 	flag.StringVar(&deleteAfter, "after", "", "Delete mails after this date")
+	flag.IntVar(&limit, "limit", 100, "Limit deletion to a specific number")
 	flag.Parse()
 
 	if sender == "" {
@@ -81,6 +84,7 @@ func main() {
 		sender:        sender,
 		deleteAfter:   parsedDeleteAfter,
 		maxResultSize: "100",
+		deleteLimit:   limit,
 	}
 
 	if err := startMailDeletion(cfg); err != nil {
