@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 	"time"
 
@@ -24,6 +25,19 @@ func startMailDeletion(srv *gmail.Service, sender string) error {
 	processedCnt := 0
 	var messagesToDelete []string
 
+	months := 1
+	fmt.Print("Specify duration in months (Default: 1, i.e, delete from current date to previous month): ")
+	fmt.Scanf("%d", &months)
+
+	// Define regex to capture "2 Jan 2006" format (day, month, year)
+	datePattern := `\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}`
+	dateRegex := regexp.MustCompile(datePattern)
+
+	deleteTillDate := time.Now().AddDate(0, -months, 0)
+	fmt.Printf("Delete till Date: %v\n\n", deleteTillDate)
+
+	const layout = "2 Jan 2006"
+
 	for ok := true; ok; ok = nextPageToken != "" {
 		messageIds, pageToken, err := listMessageIds(srv, nextPageToken, MAX_RESULT_SIZE)
 		if err != nil {
@@ -37,6 +51,23 @@ func startMailDeletion(srv *gmail.Service, sender string) error {
 				return err
 			}
 			processedCnt++
+
+			match := dateRegex.FindString(message.Date)
+			if match == "" {
+				fmt.Println("No matching date found")
+				return err
+			}
+
+			parsedDate, err := time.Parse(layout, match)
+			if err != nil {
+				fmt.Println("Error parsing date:", err)
+				return err
+			}
+
+			if parsedDate.Month() < deleteTillDate.Month() {
+				nextPageToken = ""
+				break
+			}
 
 			if senderIsTarget(message.From, sender) {
 				fmt.Printf("Id: %s\nFrom: %s\nDate: %s\nSubject: %s\n\n",
@@ -56,8 +87,6 @@ func startMailDeletion(srv *gmail.Service, sender string) error {
 			log.Println("No messages found from the target")
 			return nil
 		}
-
-		log.Println("Fetching next batch of mails")
 	}
 
 	fmt.Println()
