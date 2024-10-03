@@ -7,11 +7,19 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/gmail/v1"
 	"google.golang.org/api/option"
 )
+
+type Config struct {
+	srv           *gmail.Service
+	sender        string
+	deleteAfter   time.Time
+	maxResultSize string
+}
 
 func startServer() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -33,14 +41,14 @@ func main() {
 	go startServer()
 
 	var sender string
-	var deleteMessages bool
+	var deleteAfter string
 
 	flag.StringVar(&sender, "sender", "", "Target to delete messages")
-	flag.BoolVar(&deleteMessages, "del", false, "Whether to delete messages or not")
+	flag.StringVar(&deleteAfter, "after", "", "Delete mails after this date")
 	flag.Parse()
 
-	if sender == "" || !deleteMessages {
-		log.Fatalf("usage: ./mailer -del -sender=<target>")
+	if sender == "" {
+		log.Fatalf("usage: ./mailer -sender=<target> -after=<dd/mm/yyyy>")
 	}
 
 	ctx := context.Background()
@@ -61,9 +69,21 @@ func main() {
 		log.Fatalf("Unable to retrieve Gmail client: %v", err)
 	}
 
-	if deleteMessages {
-		if err := startMailDeletion(srv, sender); err != nil {
-			log.Fatalf("Error occurred in mailer: %v", err)
-		}
+	const dateLayout = "2/1/2006"
+
+	parsedDeleteAfter, err := time.Parse(dateLayout, deleteAfter)
+	if err != nil {
+		log.Fatalf("Error parsing date: %v", err)
+	}
+
+	cfg := &Config{
+		srv:           srv,
+		sender:        sender,
+		deleteAfter:   parsedDeleteAfter,
+		maxResultSize: "100",
+	}
+
+	if err := startMailDeletion(cfg); err != nil {
+		log.Fatalf("Error occurred in mailer: %v", err)
 	}
 }

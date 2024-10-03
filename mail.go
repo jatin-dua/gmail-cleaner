@@ -18,35 +18,27 @@ type Message struct {
 	Date    string
 }
 
-func startMailDeletion(srv *gmail.Service, sender string) error {
-	MAX_RESULT_SIZE := "500"
+func startMailDeletion(cfg *Config) error {
 	nextPageToken := ""
 	deleteCnt := 0
 	processedCnt := 0
 	var messagesToDelete []string
 
-	months := 1
-	fmt.Print("Specify duration in months (Default: 1, i.e, delete from current date to previous month): ")
-	fmt.Scanf("%d", &months)
-
 	// Define regex to capture "2 Jan 2006" format (day, month, year)
 	datePattern := `\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}`
 	dateRegex := regexp.MustCompile(datePattern)
 
-	deleteTillDate := time.Now().AddDate(0, -months, 0)
-	fmt.Printf("Delete till Date: %v\n\n", deleteTillDate)
-
 	const layout = "2 Jan 2006"
 
 	for ok := true; ok; ok = nextPageToken != "" {
-		messageIds, pageToken, err := listMessageIds(srv, nextPageToken, MAX_RESULT_SIZE)
+		messageIds, pageToken, err := listMessageIds(cfg.srv, nextPageToken, cfg.maxResultSize)
 		if err != nil {
 			// log.Fatalf("Unable to retrieve message Ids: %v", err)
 			return err
 		}
 		nextPageToken = pageToken
 		for _, id := range messageIds {
-			message, err := getMessage(srv, id)
+			message, err := getMessage(cfg.srv, id)
 			if err != nil {
 				return err
 			}
@@ -64,12 +56,12 @@ func startMailDeletion(srv *gmail.Service, sender string) error {
 				return err
 			}
 
-			if parsedDate.Month() < deleteTillDate.Month() {
+			if parsedDate.Before(cfg.deleteAfter) {
 				nextPageToken = ""
 				break
 			}
 
-			if senderIsTarget(message.From, sender) {
+			if senderIsTarget(message.From, cfg.sender) {
 				fmt.Printf("Id: %s\nFrom: %s\nDate: %s\nSubject: %s\n\n",
 					message.Id,
 					message.From,
@@ -90,13 +82,13 @@ func startMailDeletion(srv *gmail.Service, sender string) error {
 	}
 
 	fmt.Println()
-	fmt.Printf("Processed %d messages\n", processedCnt)
+	log.Printf("Processed %d messages\n", processedCnt)
 	fmt.Printf("Proceed deleting %d messages [y/N]:", deleteCnt)
 
 	var choice string
 	fmt.Scanln(&choice)
 	if strings.ToLower(choice) == "y" {
-		err := deleteMessages(srv, messagesToDelete)
+		err := deleteMessages(cfg.srv, messagesToDelete)
 		if err != nil {
 			// log.Fatalf("Failed to delete messages: %v", err)
 			return err
