@@ -51,7 +51,7 @@ func main() {
 	flag.Parse()
 
 	if sender == "" {
-		log.Fatalf("usage: ./mailer -sender=<target> -after=<dd/mm/yyyy>")
+		log.Fatalf("usage: ./gc -sender=<target> -after=<dd/mm/yyyy>")
 	}
 
 	ctx := context.Background()
