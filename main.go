@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"golang.org/x/oauth2/google"
@@ -11,7 +13,25 @@ import (
 	"google.golang.org/api/option"
 )
 
+func startServer() {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		code := r.URL.Query().Get("code")
+		if code == "" {
+			http.Error(w, "Missing authorization code", http.StatusBadRequest)
+			return
+		}
+		instruction := fmt.Sprintf("Paste this code into the terminal and press Enter to complete OAuth\n%s\n\nYou can now safely close this tab.", code)
+		fmt.Fprintf(w, instruction)
+	})
+	err := http.ListenAndServe(":8080", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func main() {
+	go startServer()
+
 	var sender string
 	var deleteMessages bool
 
